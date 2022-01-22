@@ -31,8 +31,8 @@ RegisterCommand('atm', function(source)
                     info.cardActive = false
                 end
             else
-                local player = MySQL.Sync.fetchScalar('SELECT charinfo FROM players WHERE citizenid = ?', { info.citizenid })
-                local xCH = player
+                local player = exports.oxmysql:executeSync('SELECT charinfo FROM players WHERE citizenid = ?', { info.citizenid })
+                local xCH = json.decode(player[1].charinfo)
                 if xCH.card ~= cardNum then
                     info.cardActive = false
                 end
@@ -49,13 +49,64 @@ RegisterCommand('atm', function(source)
                     info.cardActive = false
                 end
             else
-                local player = MySQL.Sync.fetchScalar('SELECT charinfo FROM players WHERE citizenid = ?', { info.citizenid })
-                xCH = player
+                local player = exports.oxmysql:executeSync('SELECT charinfo FROM players WHERE citizenid = ?', { info.citizenid })
+                xCH = json.decode(player[1].charinfo)
                 if xCH.card ~= cardNum then
                     info.cardActive = false
                 end
             end
             cards[#cards+1] = v.info
+        end
+    end
+    TriggerClientEvent('qb-atms:client:loadATM', src, cards)
+end)
+--
+RegisterServerEvent('qb-atms:server:useATM')
+AddEventHandler('qb-atms:server:useATM', function(data)
+    local src = source
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    local visas = xPlayer.Functions.GetItemsByName('visa')
+    local masters = xPlayer.Functions.GetItemsByName('mastercard')
+    local cards = {}
+
+    if visas ~= nil and masters ~= nil then
+        for _, v in pairs(visas) do
+            local info = v.info
+            local cardNum = info.cardNumber
+            local cardHolder = info.citizenid
+            local xCH = QBCore.Functions.GetPlayerByCitizenId(cardHolder)
+            if xCH ~= nil then
+                if xCH.PlayerData.charinfo.card ~= cardNum then
+                    info.cardActive = false
+                end
+            else
+                local player = exports.oxmysql:fetchSync('SELECT charinfo FROM players WHERE citizenid = ?', { info.citizenid })
+                local xCH = json.decode(player[1].charinfo)
+                if xCH.card ~= cardNum then
+                    info.cardActive = false
+                end
+            end
+            table.insert(cards, v.info)
+        end
+
+        for _, v in pairs(masters) do
+            local info = v.info
+            local cardNum = info.cardNumber
+            local cardHolder = info.citizenid
+            local xCH = QBCore.Functions.GetPlayerByCitizenId(cardHolder)
+            if xCH ~= nil then
+                if xCH.PlayerData.charinfo.card ~= cardNum then
+                    info.cardActive = false
+                end
+            else
+                local player = exports.oxmysql:fetchSync('SELECT charinfo FROM players WHERE citizenid = ?', { info.citizenid })
+                print(info.citizenid)
+                xCH = json.decode(player[1].charinfo)
+                if xCH.card ~= cardNum then
+                    info.cardActive = false
+                end
+            end
+            table.insert(cards, v.info)
         end
     end
     TriggerClientEvent('qb-atms:client:loadATM', src, cards)
@@ -96,13 +147,13 @@ RegisterNetEvent('qb-atms:server:doAccountWithdraw', function(data)
                 banking['accountinfo'] = xCH.PlayerData.charinfo.account
                 banking['cash'] = xPlayer.Functions.GetMoney('cash')
             else
-                local player = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ?', { cardHolder })
+                local player = exports.oxmysql:executeSync('SELECT * FROM players WHERE citizenid = ?', { cardHolder })
                 local xCH = json.decode(player[1])
                 local bankCount = tonumber(xCH.money.bank) - tonumber(data.amount)
                 if bankCount > 0  then
                     xPlayer.Functions.AddMoney('cash', tonumber(data.amount))
                     xCH.money.bank = bankCount
-                    MySQL.Async.execute('UPDATE players SET money = ? WHERE citizenid = ?', { xCH.money, cardHolder })
+                    exports.oxmysql:execute('UPDATE players SET money = ? WHERE citizenid = ?', { xCH.money, cardHolder })
                     dailyWithdraws[cardHolder] = dailyWithdraws[cardHolder] + tonumber(data.amount)
                     TriggerClientEvent('QBCore:Notify', src, "Withdraw $" .. data.amount .. ' from credit card. Daily Withdraws: ' .. dailyWithdraws[cardHolder], "success")
                 else
@@ -169,7 +220,7 @@ QBCore.Functions.CreateCallback('qb-atms:server:loadBankAccount', function(sourc
         banking['accountinfo'] = xCH.PlayerData.charinfo.account
         banking['cash'] = xPlayer.Functions.GetMoney('cash')
     else
-        local player = MySQL.Sync.fetchAll('SELECT * FROM players WHERE citizenid = ?', { cardHolder })
+        local player = exports.oxmysql:executeSync('SELECT * FROM players WHERE citizenid = ?', { cardHolder })
         local xCH = json.decode(player[1])
         banking['online'] = false
         banking['name'] = xCH.charinfo.firstname .. ' ' .. xCH.charinfo.lastname
