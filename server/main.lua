@@ -61,6 +61,7 @@ RegisterCommand('atm', function(source)
     TriggerClientEvent('qb-atms:client:loadATM', src, cards)
 end)
 
+
 -- Event
 
 RegisterNetEvent('qb-atms:server:doAccountWithdraw', function(data)
